@@ -166,22 +166,22 @@ export default function App() {
     setErrorMsg('')
 
     const userContent = `Symptom: ${symptom.trim()}\nOBD-II code: ${code.trim() || 'none'}\nVehicle: ${vehicle.trim() || 'unspecified'}`
-    const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY
+    const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY
 
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-          ...(apiKey ? { 'x-api-key': apiKey } : {}),
+          ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}),
         },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
+          model: 'openrouter/owl-alpha',
           max_tokens: 4096,
-          system: SYSTEM_PROMPT,
-          messages: [{ role: 'user', content: userContent }],
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'user', content: userContent },
+          ],
         }),
       })
 
@@ -191,10 +191,7 @@ export default function App() {
       }
 
       const data = await res.json()
-      const text = data.content
-        .filter(b => b.type === 'text')
-        .map(b => b.text)
-        .join('')
+      const text = data.choices?.[0]?.message?.content ?? ''
 
       const start = text.indexOf('{')
       const end = text.lastIndexOf('}')
@@ -202,7 +199,12 @@ export default function App() {
       const raw = text.slice(start, end + 1)
 
       const parsed = JSON.parse(raw)
-      parsed.causes = [...(parsed.causes ?? [])].sort((a, b) => b.likelihood - a.likelihood)
+      const causes = [...(parsed.causes ?? [])]
+      // Some models return likelihood as a 0–1 fraction; the UI expects a 0–100 integer.
+      if (causes.length > 0 && causes.every(c => c.likelihood <= 1)) {
+        causes.forEach(c => { c.likelihood = Math.round(c.likelihood * 100) })
+      }
+      parsed.causes = causes.sort((a, b) => b.likelihood - a.likelihood)
       setResult(parsed)
       setStatus('success')
     } catch (e) {
