@@ -179,7 +179,7 @@ export default function App() {
         },
         body: JSON.stringify({
           model: 'claude-sonnet-4-6',
-          max_tokens: 1000,
+          max_tokens: 2048,
           system: SYSTEM_PROMPT,
           messages: [{ role: 'user', content: userContent }],
         }),
