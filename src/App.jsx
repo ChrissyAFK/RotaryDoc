@@ -179,7 +179,7 @@ export default function App() {
         },
         body: JSON.stringify({
           model: 'claude-sonnet-4-6',
-          max_tokens: 2048,
+          max_tokens: 4096,
           system: SYSTEM_PROMPT,
           messages: [{ role: 'user', content: userContent }],
         }),
@@ -191,13 +191,15 @@ export default function App() {
       }
 
       const data = await res.json()
-      const raw = data.content
+      const text = data.content
         .filter(b => b.type === 'text')
         .map(b => b.text)
         .join('')
-        .replace(/^```(?:json)?\s*/i, '')
-        .replace(/\s*```$/, '')
-        .trim()
+
+      const start = text.indexOf('{')
+      const end = text.lastIndexOf('}')
+      if (start === -1 || end === -1) throw new Error('No JSON object found in response')
+      const raw = text.slice(start, end + 1)
 
       const parsed = JSON.parse(raw)
       parsed.causes = [...(parsed.causes ?? [])].sort((a, b) => b.likelihood - a.likelihood)
